@@ -1,3 +1,4 @@
+// script.js (ESM)
 document.addEventListener("DOMContentLoaded", async () => {
   // =========================
   // Helpers: Cart (localStorage)
@@ -15,6 +16,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const saveCart = (cart) => {
     localStorage.setItem(CART_KEY, JSON.stringify(cart));
   };
+
+  const clearCart = () => saveCart([]);
 
   const addToCart = (item) => {
     const cart = getCart();
@@ -37,6 +40,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   // =========================
+  // Helpers: Products API
+  // =========================
+  async function fetchProducts() {
+    const res = await fetch("/api/products");
+    if (!res.ok) return [];
+    return res.json();
+  }
+
+  async function fetchProductById(id) {
+    const res = await fetch(`/api/products/${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return res.json();
+  }
+
+  // =========================
+  // Helpers: Sales (localStorage)  ✅ (no necesitas /api/sales)
+  // =========================
+  const SALES_KEY = "arcane_sales_v1";
+
+  function getSales() {
+    try {
+      return JSON.parse(localStorage.getItem(SALES_KEY)) || {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveSales(sales) {
+    localStorage.setItem(SALES_KEY, JSON.stringify(sales));
+  }
+
+  function addSalesFromCheckoutItems(items) {
+    const sales = getSales();
+    items.forEach((it) => {
+      const id = String(it.id || "").trim();
+      const qty = Number(it.qty || 0);
+      if (!id || !Number.isFinite(qty) || qty <= 0) return;
+      sales[id] = Number(sales[id] || 0) + qty;
+    });
+    saveSales(sales);
+  }
+
+  // =========================
   // UI: Cart Overlay
   // =========================
   const cartOverlay = document.getElementById("cartOverlay");
@@ -46,6 +92,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const cartTotalEl = document.getElementById("cartTotal");
   const cartItemTemplate = document.getElementById("cartItemTemplate");
   const headerCartBtn = document.querySelector(".shopping-car-button");
+  const checkoutBtn = document.querySelector(".cart-checkout-btn");
 
   function openCart() {
     if (!cartOverlay || !cartBackdrop) return;
@@ -85,12 +132,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // =========================
   // Render Cart
   // =========================
-  async function fetchProductById(id) {
-    const res = await fetch(`/api/products/${encodeURIComponent(id)}`);
-    if (!res.ok) return null;
-    return res.json();
-  }
-
   async function renderCart() {
     if (!cartBody || !cartItemTemplate) return;
 
@@ -100,8 +141,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!cart.length) {
       cartBody.innerHTML = `<p class="cart-empty">Your cart is empty.</p>`;
       if (cartTotalEl) cartTotalEl.textContent = "$0.00";
+      if (checkoutBtn) checkoutBtn.disabled = true;
       return;
     }
+
+    // enable checkout (validaremos stock al hacer checkout)
+    if (checkoutBtn) checkoutBtn.disabled = false;
 
     const detailed = await Promise.all(
       cart.map(async (c) => {
@@ -142,6 +187,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       btnRemove?.addEventListener("click", () => {
         removeFromCart(item.id, item.size);
         renderCart();
+        // charts / gallery might depend on cart? not necessary
       });
 
       btnInc?.addEventListener("click", () => {
@@ -156,17 +202,78 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // =========================
+  // Checkout: RESTA STOCK en server + guarda "ventas" local
+  // =========================
+  async function checkout() {
+    const items = getCart();
+    if (!items.length) return;
+
+    try {
+      if (checkoutBtn) {
+        checkoutBtn.disabled = true;
+        checkoutBtn.textContent = "Processing...";
+      }
+
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        console.error("Checkout failed:", data);
+
+        // Mensaje simple (si quieres, luego lo hacemos UI bonito)
+        const msg =
+          data?.error ||
+          "Checkout failed. Please check stock and try again.";
+        alert(msg);
+        return;
+      }
+
+      // ✅ ventas (local)
+      addSalesFromCheckoutItems(items);
+
+      // ✅ limpiar carrito
+      clearCart();
+
+      // ✅ refrescar UI
+      await renderCart();
+
+      // ✅ refrescar stock en páginas (si estás en products.html)
+      await refreshProductPageAfterCheckout();
+
+      // ✅ refrescar galería (si estás en index.html)
+      await refreshGalleryAfterCheckout();
+
+      // ✅ refrescar charts (si existen)
+      await renderChartsOnIndex();
+
+      alert("Checkout successful!");
+      closeCart();
+    } finally {
+      if (checkoutBtn) {
+        checkoutBtn.disabled = getCart().length === 0;
+        checkoutBtn.textContent = "Checkout";
+      }
+    }
+  }
+
+  checkoutBtn?.addEventListener("click", checkout);
+
+  // =========================
   // Gallery (index.html)
   // =========================
   const gallery = document.getElementById("merchGallery");
   const merchTemplate = document.getElementById("merchCardTemplate");
 
-  if (gallery && merchTemplate) {
-    try {
-      const res = await fetch("/api/products");
-      if (!res.ok) throw new Error("Failed to fetch products");
-      const products = await res.json();
+  async function renderGallery() {
+    if (!gallery || !merchTemplate) return;
 
+    try {
+      const products = await fetchProducts();
       gallery.innerHTML = "";
 
       products.forEach((product) => {
@@ -214,9 +321,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         card.style.cursor = "pointer";
         card.addEventListener("click", (e) => {
           if (e.target.closest("[data-add-to-cart]")) return;
-          window.location.href = `products.html?id=${encodeURIComponent(
-            product.id
-          )}`;
+          window.location.href = `products.html?id=${encodeURIComponent(product.id)}`;
         });
 
         addBtn.addEventListener("click", (e) => {
@@ -236,70 +341,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  async function refreshGalleryAfterCheckout() {
+    // Solo si existe la galería
+    if (!gallery || !merchTemplate) return;
+    await renderGallery();
+  }
+
+  if (gallery && merchTemplate) {
+    await renderGallery();
+  }
+
   // =========================
   // Products page (products.html)
   // =========================
   const url = new URL(window.location.href);
   const productId = url.searchParams.get("id");
 
-  const productPage = document.querySelector(".main-retail-content");
-  if (productPage && productId) {
-    const product = await fetchProductById(productId);
-
-    if (!product) {
-      productPage.innerHTML = `<p style="padding:2rem;font-family:Inter,sans-serif;">Product not found.</p>`;
-      return;
-    }
-
-    // ✅ Referencias (usa tus clases actuales)
+  async function renderProductPage(product) {
+    // Referencias
     const breadcrumbStrong = document.querySelector(".name-product strong");
     const leftImg = document.querySelector(".left-retail-side img");
+    const typeSpan = document.querySelector("[data-product-type]");
     const titleH1 = document.querySelector(".r-top-retail-side h1");
     const priceSpan = document.querySelector(".r-mid-retail-side > span");
     const productTags = document.querySelector(".product-tags");
     const stockText = document.querySelector(".stock-style .out-stock-style");
-
-    // ✅ NUEVO: fulfillment + typeLine + description + stock span debajo de tallas
     const fulfillmentEl = document.querySelector("[data-product-fulfillment]");
-    const typeEl = document.querySelector("[data-product-type]");
     const descEl = document.querySelector("[data-product-description]");
     const stockInfoEl = document.querySelector("[data-product-stock-info]");
 
-    // ✅ set data
     if (breadcrumbStrong) breadcrumbStrong.textContent = product.name;
 
     if (leftImg) {
       leftImg.src = product.image;
       leftImg.alt = product.name;
-
-      // (Opcional) fallback si la imagen no existe
-      leftImg.onerror = () => {
-        leftImg.src = "./images/products-images/placeholder.png";
-      };
     }
+
+    if (typeSpan) typeSpan.textContent = product.typeLine || "";
 
     if (titleH1) titleH1.textContent = product.name;
+
     if (priceSpan) priceSpan.textContent = `$${Number(product.price).toFixed(2)}`;
 
-    // ✅ typeLine (viene de tu JSON)
-    if (typeEl) typeEl.textContent = product.typeLine || "";
-
-    // ✅ fulfillment (viene de tu JSON)
-    if (fulfillmentEl) {
-      fulfillmentEl.textContent =
-        product.fulfillment || "Estimated Fulfillment Begins Mar 31, 2026";
-    }
-
-    // ✅ description (viene de tu JSON)
     if (descEl) descEl.textContent = product.description || "";
 
-    // ✅ stock info debajo de tallas
-    if (stockInfoEl) {
-      const s = Number(product.stock) || 0;
-      stockInfoEl.textContent = s > 0 ? `In Stock: ${s}` : "Out of stock";
-    }
+    if (fulfillmentEl) fulfillmentEl.textContent = product.fulfillment || "";
 
-    // Tags arriba (reusa tus estilos)
+    // Tags
     if (productTags) {
       productTags.innerHTML = "";
       (product.tags || []).forEach((tag) => {
@@ -324,18 +412,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
-    // Stock main CTA (tu span out-stock-style)
-    const inStock = Number(product.stock) > 0;
+    // Stock labels + info
+    const stockNum = Number(product.stock || 0);
+    const inStock = stockNum > 0;
+
     if (stockText) stockText.textContent = inStock ? "Add To Cart" : "Out Of Stock";
 
+    if (stockInfoEl) stockInfoEl.textContent = inStock ? `In Stock: ${stockNum}` : "In Stock: 0";
+
+    // Click to add (span out-stock-style)
     if (stockText) {
       stockText.style.cursor = inStock ? "pointer" : "not-allowed";
-      stockText.addEventListener("click", () => {
+
+      // evita acumular listeners si re-renderizas
+      stockText.replaceWith(stockText.cloneNode(true));
+      const newStockText = document.querySelector(".stock-style .out-stock-style");
+
+      newStockText.style.cursor = inStock ? "pointer" : "not-allowed";
+      newStockText.addEventListener("click", () => {
         if (!inStock) return;
 
-        const selectedSize =
-          document.querySelector('input[name="size"]:checked')?.value || "S";
-
+        const selectedSize = document.querySelector('input[name="size"]:checked')?.value || "S";
         addToCart({ id: product.id, size: selectedSize, qty: 1 });
         renderCart();
         openCart();
@@ -343,8 +440,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  async function refreshProductPageAfterCheckout() {
+    const productPage = document.querySelector(".main-retail-content");
+    if (!productPage || !productId) return;
+
+    const fresh = await fetchProductById(productId);
+    if (!fresh) return;
+
+    await renderProductPage(fresh);
+  }
+
+  const productPage = document.querySelector(".main-retail-content");
+  if (productPage && productId) {
+    const product = await fetchProductById(productId);
+
+    if (!product) {
+      productPage.innerHTML = `<p style="padding:2rem;font-family:Inter,sans-serif;">Product not found.</p>`;
+      return;
+    }
+
+    await renderProductPage(product);
+  }
+
   // =========================
-  // Selected size UI (products.html)
+  // Selected size text (#selectedSize strong)
   // =========================
   const selectedSizeStrong = document.querySelector("#selectedSize strong");
   const sizeRadios = document.querySelectorAll('input[name="size"]');
@@ -362,7 +481,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateSelectedSize();
 
   // =========================
-  // Reviews (products.html)
+  // Reviews (products.html) - localStorage por producto
   // =========================
   const reviewsForm = document.getElementById("reviewForm");
   const reviewsList = document.getElementById("reviewsList");
@@ -377,20 +496,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const REVIEWS_KEY_PREFIX = "arcane_reviews_v1_";
 
-  function getReviewsKey(pid) {
-    return `${REVIEWS_KEY_PREFIX}${pid}`;
+  function getReviewsKey(productId) {
+    return `${REVIEWS_KEY_PREFIX}${productId}`;
   }
 
-  function getReviews(pid) {
+  function getReviews(productId) {
     try {
-      return JSON.parse(localStorage.getItem(getReviewsKey(pid))) || [];
+      return JSON.parse(localStorage.getItem(getReviewsKey(productId))) || [];
     } catch {
       return [];
     }
   }
 
-  function saveReviews(pid, reviews) {
-    localStorage.setItem(getReviewsKey(pid), JSON.stringify(reviews));
+  function saveReviews(productId, reviews) {
+    localStorage.setItem(getReviewsKey(productId), JSON.stringify(reviews));
   }
 
   function starsText(n) {
@@ -401,20 +520,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function formatDate(ts) {
     const d = new Date(ts);
-    return d.toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   }
 
-  function renderReviews(pid) {
+  function renderReviews(productId) {
     if (!reviewsList || !avgRatingEl || !avgStarsEl || !reviewsCountEl) return;
 
-    const reviews = getReviews(pid);
-
+    const reviews = getReviews(productId);
     const count = reviews.length;
-    const avg = count ? reviews.reduce((a, r) => a + r.rating, 0) / count : 0;
+    const avg = count ? (reviews.reduce((a, r) => a + r.rating, 0) / count) : 0;
 
     avgRatingEl.textContent = avg.toFixed(1);
     avgStarsEl.textContent = starsText(Math.round(avg));
@@ -451,9 +565,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function updateRatingHint() {
     if (!ratingHint) return;
     const r = getSelectedRating();
-    ratingHint.textContent = r
-      ? `You selected ${r} star${r === 1 ? "" : "s"}`
-      : "Select a rating";
+    ratingHint.textContent = r ? `You selected ${r} star${r === 1 ? "" : "s"}` : "Select a rating";
   }
 
   document.querySelectorAll('input[name="rating"]').forEach((r) => {
@@ -486,7 +598,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       saveReviews(productId, reviews);
 
-      // reset
       reviewsForm.reset();
       updateRatingHint();
       if (reviewComment) reviewComment.value = "";
@@ -494,4 +605,86 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderReviews(productId);
     });
   }
+
+  // =========================
+  // Charts.js (index.html)
+  // =========================
+  let stockChartInstance = null;
+  let salesChartInstance = null;
+  let reviewsChartInstance = null;
+
+  function getAvgRating(productId) {
+    const reviews = getReviews(productId);
+    if (!reviews.length) return 0;
+    const sum = reviews.reduce((acc, r) => acc + Number(r.rating || 0), 0);
+    return sum / reviews.length;
+  }
+
+  async function renderChartsOnIndex() {
+    const stockCanvas = document.getElementById("stockChart");
+    const salesCanvas = document.getElementById("salesChart");
+    const reviewsCanvas = document.getElementById("reviewsChart");
+
+    // Solo corre si estamos en index.html (existen los canvas)
+    if (!stockCanvas || !salesCanvas || !reviewsCanvas) return;
+
+    if (typeof Chart === "undefined") {
+      console.warn("Chart.js not loaded. Add: <script src='https://cdn.jsdelivr.net/npm/chart.js'></script> before script.js");
+      return;
+    }
+
+    const products = await fetchProducts();
+    const sales = getSales();
+
+    const labels = products.map((p) => p.name);
+    const stockData = products.map((p) => Number(p.stock || 0));
+    const soldData = products.map((p) => Number(sales[p.id] || 0));
+    const avgRatings = products.map((p) => Number(getAvgRating(p.id).toFixed(2)));
+
+    if (stockChartInstance) stockChartInstance.destroy();
+    if (salesChartInstance) salesChartInstance.destroy();
+    if (reviewsChartInstance) reviewsChartInstance.destroy();
+
+    stockChartInstance = new Chart(stockCanvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{ label: "Stock", data: stockData }],
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+
+    salesChartInstance = new Chart(salesCanvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{ label: "Units Sold", data: soldData }],
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+
+    reviewsChartInstance = new Chart(reviewsCanvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{ label: "Avg Rating (0–5)", data: avgRatings }],
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true, max: 5 } },
+      },
+    });
+  }
+
+  // pinta charts si estás en index
+  await renderChartsOnIndex();
+
+  // Inicial render cart button state
+  await renderCart();
 });

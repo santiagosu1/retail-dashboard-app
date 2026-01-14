@@ -926,3 +926,43 @@ h1 {
   opacity: 0.75;
   padding: 1rem 0;
 }
+
+/* Charts Section */
+.charts-section {
+  padding: 4rem 2rem;
+}
+
+.charts-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: "Inter", sans-serif;
+}
+
+.charts-title {
+  font-size: 2.4rem;
+  margin-bottom: 2rem;
+}
+
+.charts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.chart-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 1.2rem;
+  padding: 1.6rem;
+}
+
+.chart-card h3 {
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 1024px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}

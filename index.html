@@ -93,6 +93,30 @@
         </div>
       </template>
     </div>
+    <!-- ANALYTICS / CHARTS -->
+    <section class="charts-section" aria-label="Store analytics">
+      <div class="charts-wrapper">
+        <h2 class="charts-title">Store Analytics</h2>
+
+        <div class="charts-container">
+          <article class="chart-card">
+            <h3>Availability (Stock)</h3>
+            <canvas id="stockChart"></canvas>
+          </article>
+
+          <article class="chart-card">
+            <h3>Sales (Units Sold)</h3>
+            <canvas id="salesChart"></canvas>
+          </article>
+
+          <article class="chart-card">
+            <h3>User Reviews (Average Rating)</h3>
+            <canvas id="reviewsChart"></canvas>
+          </article>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Cart Backdrop -->
@@ -159,7 +183,7 @@
       <button class="cart-checkout-btn" type="button" disabled>Checkout</button>
     </div>
   </aside>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script type="module" src="./script.js"></script>
 </body>
 </html>
