@@ -214,7 +214,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         card.style.cursor = "pointer";
         card.addEventListener("click", (e) => {
           if (e.target.closest("[data-add-to-cart]")) return;
-          window.location.href = `products.html?id=${encodeURIComponent(product.id)}`;
+          window.location.href = `products.html?id=${encodeURIComponent(
+            product.id
+          )}`;
         });
 
         addBtn.addEventListener("click", (e) => {
@@ -235,7 +237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // =========================
-  // Products page (products.html) ✅ YA FUNCIONA
+  // Products page (products.html)
   // =========================
   const url = new URL(window.location.href);
   const productId = url.searchParams.get("id");
@@ -257,14 +259,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     const productTags = document.querySelector(".product-tags");
     const stockText = document.querySelector(".stock-style .out-stock-style");
 
+    // ✅ NUEVO: fulfillment + typeLine + description + stock span debajo de tallas
+    const fulfillmentEl = document.querySelector("[data-product-fulfillment]");
+    const typeEl = document.querySelector("[data-product-type]");
+    const descEl = document.querySelector("[data-product-description]");
+    const stockInfoEl = document.querySelector("[data-product-stock-info]");
+
     // ✅ set data
     if (breadcrumbStrong) breadcrumbStrong.textContent = product.name;
+
     if (leftImg) {
       leftImg.src = product.image;
       leftImg.alt = product.name;
+
+      // (Opcional) fallback si la imagen no existe
+      leftImg.onerror = () => {
+        leftImg.src = "./images/products-images/placeholder.png";
+      };
     }
+
     if (titleH1) titleH1.textContent = product.name;
     if (priceSpan) priceSpan.textContent = `$${Number(product.price).toFixed(2)}`;
+
+    // ✅ typeLine (viene de tu JSON)
+    if (typeEl) typeEl.textContent = product.typeLine || "";
+
+    // ✅ fulfillment (viene de tu JSON)
+    if (fulfillmentEl) {
+      fulfillmentEl.textContent =
+        product.fulfillment || "Estimated Fulfillment Begins Mar 31, 2026";
+    }
+
+    // ✅ description (viene de tu JSON)
+    if (descEl) descEl.textContent = product.description || "";
+
+    // ✅ stock info debajo de tallas
+    if (stockInfoEl) {
+      const s = Number(product.stock) || 0;
+      stockInfoEl.textContent = s > 0 ? `In Stock: ${s}` : "Out of stock";
+    }
 
     // Tags arriba (reusa tus estilos)
     if (productTags) {
@@ -277,7 +310,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           span.className = "new-tag-style";
           span.textContent = "New";
         } else if (t === "retired") {
-          span.className = "retired-tag-style"; // si no tienes retired style aquí, puedes cambiarlo
+          span.className = "retired-tag-style";
           span.textContent = "Retired";
         } else if (t === "preorder") {
           span.className = "preorder-tag-style";
@@ -291,19 +324,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
-    // Stock
+    // Stock main CTA (tu span out-stock-style)
     const inStock = Number(product.stock) > 0;
     if (stockText) stockText.textContent = inStock ? "Add To Cart" : "Out Of Stock";
 
-    // ✅ BOTÓN "Out of stock / Add to cart" (tu span out-stock-style)
-    // lo volvemos clickeable si hay stock
     if (stockText) {
       stockText.style.cursor = inStock ? "pointer" : "not-allowed";
       stockText.addEventListener("click", () => {
         if (!inStock) return;
 
-        // Tamaño seleccionado
-        const selectedSize = document.querySelector('input[name="size"]:checked')?.value || "S";
+        const selectedSize =
+          document.querySelector('input[name="size"]:checked')?.value || "S";
 
         addToCart({ id: product.id, size: selectedSize, qty: 1 });
         renderCart();
@@ -311,6 +342,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
   }
+
+  // =========================
+  // Selected size UI (products.html)
+  // =========================
   const selectedSizeStrong = document.querySelector("#selectedSize strong");
   const sizeRadios = document.querySelectorAll('input[name="size"]');
 
@@ -320,11 +355,143 @@ document.addEventListener("DOMContentLoaded", async () => {
     selectedSizeStrong.textContent = checked.value;
   }
 
-  // Cambia cuando seleccionas una talla
   sizeRadios.forEach((radio) => {
     radio.addEventListener("change", updateSelectedSize);
   });
 
-  // Set inicial (por si el HTML viene ya con checked)
   updateSelectedSize();
+
+  // =========================
+  // Reviews (products.html)
+  // =========================
+  const reviewsForm = document.getElementById("reviewForm");
+  const reviewsList = document.getElementById("reviewsList");
+  const reviewsEmpty = document.getElementById("reviewsEmpty");
+  const reviewComment = document.getElementById("reviewComment");
+  const reviewError = document.getElementById("reviewError");
+
+  const avgRatingEl = document.getElementById("avgRating");
+  const avgStarsEl = document.getElementById("avgStars");
+  const reviewsCountEl = document.getElementById("reviewsCount");
+  const ratingHint = document.getElementById("ratingHint");
+
+  const REVIEWS_KEY_PREFIX = "arcane_reviews_v1_";
+
+  function getReviewsKey(pid) {
+    return `${REVIEWS_KEY_PREFIX}${pid}`;
+  }
+
+  function getReviews(pid) {
+    try {
+      return JSON.parse(localStorage.getItem(getReviewsKey(pid))) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveReviews(pid, reviews) {
+    localStorage.setItem(getReviewsKey(pid), JSON.stringify(reviews));
+  }
+
+  function starsText(n) {
+    const full = "★★★★★".slice(0, n);
+    const empty = "☆☆☆☆☆".slice(0, 5 - n);
+    return full + empty;
+  }
+
+  function formatDate(ts) {
+    const d = new Date(ts);
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  function renderReviews(pid) {
+    if (!reviewsList || !avgRatingEl || !avgStarsEl || !reviewsCountEl) return;
+
+    const reviews = getReviews(pid);
+
+    const count = reviews.length;
+    const avg = count ? reviews.reduce((a, r) => a + r.rating, 0) / count : 0;
+
+    avgRatingEl.textContent = avg.toFixed(1);
+    avgStarsEl.textContent = starsText(Math.round(avg));
+    reviewsCountEl.textContent = `${count} review${count === 1 ? "" : "s"}`;
+
+    reviewsList.innerHTML = "";
+    if (!count) {
+      if (reviewsEmpty) reviewsList.appendChild(reviewsEmpty);
+      return;
+    }
+
+    reviews.forEach((r) => {
+      const card = document.createElement("div");
+      card.className = "review-card";
+
+      card.innerHTML = `
+        <div class="review-card-top">
+          <div class="review-card-stars">${starsText(r.rating)}</div>
+          <div class="review-card-date">${formatDate(r.createdAt)}</div>
+        </div>
+        <div class="review-card-text"></div>
+      `;
+
+      card.querySelector(".review-card-text").textContent = r.comment;
+      reviewsList.appendChild(card);
+    });
+  }
+
+  function getSelectedRating() {
+    const checked = document.querySelector('input[name="rating"]:checked');
+    return checked ? Number(checked.value) : 0;
+  }
+
+  function updateRatingHint() {
+    if (!ratingHint) return;
+    const r = getSelectedRating();
+    ratingHint.textContent = r
+      ? `You selected ${r} star${r === 1 ? "" : "s"}`
+      : "Select a rating";
+  }
+
+  document.querySelectorAll('input[name="rating"]').forEach((r) => {
+    r.addEventListener("change", updateRatingHint);
+  });
+
+  if (productId && reviewsForm && reviewsList) {
+    renderReviews(productId);
+    updateRatingHint();
+
+    reviewsForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const rating = getSelectedRating();
+      const comment = (reviewComment?.value || "").trim();
+
+      if (!rating) {
+        if (reviewError) reviewError.hidden = false;
+        return;
+      }
+      if (reviewError) reviewError.hidden = true;
+
+      const reviews = getReviews(productId);
+
+      reviews.unshift({
+        rating,
+        comment,
+        createdAt: Date.now(),
+      });
+
+      saveReviews(productId, reviews);
+
+      // reset
+      reviewsForm.reset();
+      updateRatingHint();
+      if (reviewComment) reviewComment.value = "";
+
+      renderReviews(productId);
+    });
+  }
 });

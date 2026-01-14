@@ -113,7 +113,7 @@
                 <span class="selector-size-style">2XL</span>
               </label>
             </div>
-
+            <span class="stock-info" data-product-stock-info>In Stock: --</span>
             <div class="stock-main-container">
               <span><strong data-product-fulfillment>Estimated Fulfillment Begins Mar 31, 2026</strong></span>
 
@@ -154,6 +154,75 @@
         </div>
       </div>
     </div>
+    <!-- REVIEWS SECTION-->
+    <section class="reviews-section" aria-label="Product reviews">
+      <div class="reviews-wrapper">
+        <h2 class="reviews-title">Reviews</h2>
+
+        <!-- Summary -->
+        <div class="reviews-summary">
+          <div class="reviews-avg">
+            <span class="avg-number" id="avgRating">0.0</span>
+            <span class="avg-outof">/ 5</span>
+          </div>
+
+          <div class="reviews-stars" id="avgStars" aria-hidden="true">
+            ★★★★★
+          </div>
+
+          <span class="reviews-count" id="reviewsCount">0 reviews</span>
+        </div>
+
+        <!-- Form -->
+        <form class="review-form" id="reviewForm">
+          <h3 class="review-form-title">Leave a review</h3>
+
+          <div class="rating-picker" aria-label="Rate this product">
+            <span class="rating-label">Your rating</span>
+
+            <div class="star-input" role="radiogroup" aria-label="Star rating">
+              <input type="radio" id="star5" name="rating" value="5" />
+              <label for="star5" title="5 stars">★</label>
+
+              <input type="radio" id="star4" name="rating" value="4" />
+              <label for="star4" title="4 stars">★</label>
+
+              <input type="radio" id="star3" name="rating" value="3" />
+              <label for="star3" title="3 stars">★</label>
+
+              <input type="radio" id="star2" name="rating" value="2" />
+              <label for="star2" title="2 stars">★</label>
+
+              <input type="radio" id="star1" name="rating" value="1" />
+              <label for="star1" title="1 star">★</label>
+            </div>
+
+            <span class="rating-hint" id="ratingHint">Select a rating</span>
+          </div>
+
+          <label class="review-label">
+            Comment
+            <textarea
+              id="reviewComment"
+              rows="4"
+              placeholder="Write your review..."
+              required
+            ></textarea>
+          </label>
+
+          <button class="review-submit-btn" type="submit">
+            Post review
+          </button>
+
+          <p class="review-error" id="reviewError" hidden>Please select a rating.</p>
+        </form>
+
+        <!-- List -->
+        <div class="reviews-list" id="reviewsList">
+          <p class="reviews-empty" id="reviewsEmpty">No reviews yet. Be the first!</p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- Cart Backdrop -->
