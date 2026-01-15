@@ -158,20 +158,18 @@ li {
     cursor: pointer;
 }
 
-/* =========================
-   CART OVERLAY (RIGHT)
-   ========================= */
+/* CART OVERLAY (RIGHT) */
 .cart-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.6);
-  z-index: 998; /* debajo del panel */
+  z-index: 998; 
 }
 
 .cart-overlay {
   position: fixed;
   top: 0;
-  right: 0;                 /* ✅ panel a la derecha */
+  right: 0;                 
   height: 100dvh;
   width: min(420px, 92vw);
   background: #fff;
@@ -179,13 +177,13 @@ li {
   z-index: 999;
   padding: 1rem;
 
-  transform: translateX(100%);  /* ✅ fuera de pantalla hacia la derecha */
+  transform: translateX(100%);  
   transition: transform 0.25s ease;
 
   display: flex;
   flex-direction: column;
 
-  border-left: 1px solid rgba(0,0,0,0.12); /* ✅ borde visible en blanco */
+  border-left: 1px solid rgba(0,0,0,0.12); 
 }
 
 .cart-overlay.is-open {
@@ -215,7 +213,7 @@ li {
   text-transform: uppercase;
   width: 75px;
   background: transparent;
-  border: 1px solid rgba(0,0,0,0.2); /* ✅ antes era blanco */
+  border: 1px solid rgba(0,0,0,0.2); 
   color: #111;
   height: 38px;
   border-radius: 10px;
@@ -382,7 +380,7 @@ li {
 }
 .merch-gallery-wrapper {
   display: grid;
-  grid-template-columns: repeat(4, 1fr); /* 4 cards por fila en desktop */
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.2rem;
 }
 
@@ -478,7 +476,6 @@ li {
     cursor: pointer;
 }
 
-/* ✅ NUEVO: responsive para la galería */
 @media (max-width: 1024px) {
     .card-design {
         max-width: 48%;
@@ -527,10 +524,9 @@ li {
     min-width: 65%;
     padding: 1.5rem;
 
-    overflow: hidden; /* CLAVE */
+    overflow: hidden;
 }
 
-/* Background real */
 .left-retail-side::before {
     content: "";
     position: absolute;
@@ -541,7 +537,7 @@ li {
     background-position: center 15%;
     background-size: contain;
 
-    transform: scaleY(1.15); /* 🔥 SOLO eje Y */
+    transform: scaleY(1.15);
     transform-origin: center;
 
     z-index: -1;
@@ -721,9 +717,7 @@ h1 {
     flex-direction: column;
 }
  /* reviews section */
- /* =========================
-   REVIEWS
-   ========================= */
+
 .reviews-section{
   background: #0a0a0a;
   color: #fff;
@@ -813,7 +807,7 @@ h1 {
   font-size: 0.9rem;
 }
 
-/* ⭐ Stars input (no JS-heavy) */
+/*  Stars input  */
 .star-input{
   display: inline-flex;
   flex-direction: row-reverse;
@@ -870,6 +864,8 @@ h1 {
 }
 
 .review-submit-btn{
+  width: 100px;
+  font-family: var(--normal-font-1);
   height: 46px;
   border-radius: 12px;
   border: none;

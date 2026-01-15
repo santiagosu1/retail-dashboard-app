@@ -1,8 +1,6 @@
-// script.js (ESM)
 document.addEventListener("DOMContentLoaded", async () => {
-  // =========================
-  // Helpers: Cart (localStorage)
-  // =========================
+  //Cart (localStorage)
+
   const CART_KEY = "arcane_cart_v1";
 
   const getCart = () => {
@@ -39,9 +37,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     saveCart(cart);
   };
 
-  // =========================
-  // Helpers: Products API
-  // =========================
+
+  // Products API
+
   async function fetchProducts() {
     const res = await fetch("/api/products");
     if (!res.ok) return [];
@@ -54,9 +52,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     return res.json();
   }
 
-  // =========================
-  // Helpers: Sales (localStorage)  ✅ (no necesitas /api/sales)
-  // =========================
+  //Sales (localStorage)  
+
   const SALES_KEY = "arcane_sales_v1";
 
   function getSales() {
@@ -82,9 +79,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     saveSales(sales);
   }
 
-  // =========================
-  // UI: Cart Overlay
-  // =========================
+  // Cart Overlay
+
   const cartOverlay = document.getElementById("cartOverlay");
   const cartBackdrop = document.getElementById("cartBackdrop");
   const cartCloseBtn = document.getElementById("cartCloseBtn");
@@ -128,10 +124,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       closeCart();
     }
   });
-
-  // =========================
   // Render Cart
-  // =========================
+
   async function renderCart() {
     if (!cartBody || !cartItemTemplate) return;
 
@@ -145,7 +139,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    // enable checkout (validaremos stock al hacer checkout)
+    // enable checkout
     if (checkoutBtn) checkoutBtn.disabled = false;
 
     const detailed = await Promise.all(
@@ -187,7 +181,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       btnRemove?.addEventListener("click", () => {
         removeFromCart(item.id, item.size);
         renderCart();
-        // charts / gallery might depend on cart? not necessary
+
       });
 
       btnInc?.addEventListener("click", () => {
@@ -201,9 +195,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (cartTotalEl) cartTotalEl.textContent = `$${total.toFixed(2)}`;
   }
 
-  // =========================
-  // Checkout: RESTA STOCK en server + guarda "ventas" local
-  // =========================
+
+  // Checkout: substract stock, clear cart, update sales
+
   async function checkout() {
     const items = getCart();
     if (!items.length) return;
@@ -225,7 +219,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!res.ok) {
         console.error("Checkout failed:", data);
 
-        // Mensaje simple (si quieres, luego lo hacemos UI bonito)
         const msg =
           data?.error ||
           "Checkout failed. Please check stock and try again.";
@@ -233,22 +226,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      // ✅ ventas (local)
       addSalesFromCheckoutItems(items);
 
-      // ✅ limpiar carrito
       clearCart();
 
-      // ✅ refrescar UI
       await renderCart();
 
-      // ✅ refrescar stock en páginas (si estás en products.html)
       await refreshProductPageAfterCheckout();
 
-      // ✅ refrescar galería (si estás en index.html)
       await refreshGalleryAfterCheckout();
 
-      // ✅ refrescar charts (si existen)
+
       await renderChartsOnIndex();
 
       alert("Checkout successful!");
@@ -263,9 +251,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   checkoutBtn?.addEventListener("click", checkout);
 
-  // =========================
   // Gallery (index.html)
-  // =========================
+
   const gallery = document.getElementById("merchGallery");
   const merchTemplate = document.getElementById("merchCardTemplate");
 
@@ -342,7 +329,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function refreshGalleryAfterCheckout() {
-    // Solo si existe la galería
+    // if there is a gallery
     if (!gallery || !merchTemplate) return;
     await renderGallery();
   }
@@ -350,15 +337,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (gallery && merchTemplate) {
     await renderGallery();
   }
+  // Products page
 
-  // =========================
-  // Products page (products.html)
-  // =========================
   const url = new URL(window.location.href);
   const productId = url.searchParams.get("id");
 
   async function renderProductPage(product) {
-    // Referencias
+    // products divs class
     const breadcrumbStrong = document.querySelector(".name-product strong");
     const leftImg = document.querySelector(".left-retail-side img");
     const typeSpan = document.querySelector("[data-product-type]");
@@ -420,11 +405,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (stockInfoEl) stockInfoEl.textContent = inStock ? `In Stock: ${stockNum}` : "In Stock: 0";
 
-    // Click to add (span out-stock-style)
+    // Click to add
     if (stockText) {
       stockText.style.cursor = inStock ? "pointer" : "not-allowed";
 
-      // evita acumular listeners si re-renderizas
+      // evita acumular listeners si se re-renderiza
       stockText.replaceWith(stockText.cloneNode(true));
       const newStockText = document.querySelector(".stock-style .out-stock-style");
 
@@ -462,9 +447,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await renderProductPage(product);
   }
 
-  // =========================
-  // Selected size text (#selectedSize strong)
-  // =========================
+  // Selected size text
+
   const selectedSizeStrong = document.querySelector("#selectedSize strong");
   const sizeRadios = document.querySelectorAll('input[name="size"]');
 
@@ -480,9 +464,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   updateSelectedSize();
 
-  // =========================
-  // Reviews (products.html) - localStorage por producto
-  // =========================
+  // Reviews (products.html) - localStorage per product
+
   const reviewsForm = document.getElementById("reviewForm");
   const reviewsList = document.getElementById("reviewsList");
   const reviewsEmpty = document.getElementById("reviewsEmpty");
@@ -605,10 +588,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderReviews(productId);
     });
   }
-
-  // =========================
   // Charts.js (index.html)
-  // =========================
   let stockChartInstance = null;
   let salesChartInstance = null;
   let reviewsChartInstance = null;
@@ -625,7 +605,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const salesCanvas = document.getElementById("salesChart");
     const reviewsCanvas = document.getElementById("reviewsChart");
 
-    // Solo corre si estamos en index.html (existen los canvas)
+    // ONLY EXIST IF ON INDEX.HTML
     if (!stockCanvas || !salesCanvas || !reviewsCanvas) return;
 
     if (typeof Chart === "undefined") {
@@ -682,9 +662,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // pinta charts si estás en index
+  // paint charts
   await renderChartsOnIndex();
-
-  // Inicial render cart button state
+// render charts
   await renderCart();
 });
